@@ -3,6 +3,7 @@
 [![Wanted Behavior](https://img.youtube.com/vi/MU2-9qw7xYg/0.jpg)](https://www.youtube.com/watch?v=MU2-9qw7xYg)
 
 # Key points of the reader:
+* Webtoon view(top-to-bottom) or regular(left-to-right)
 * You can zoom in/out 
 * Ability to set maximum/minimum zoom scale
 * When you zoom out the reader is centered
