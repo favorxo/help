@@ -9,5 +9,6 @@
 * When you zoom in you can't get out of content(go beyond images)
 * When zooming the translate x, y will be in the center of your pinch gesture
 * Double tap to reset zoom
+* Scroll experience like with `<ScrollView />`
 # TODO/Whys
 * I don't know why, but without wrapping whole reader into screen with react-navigation, gestures don't appear to work
