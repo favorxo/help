@@ -10,17 +10,37 @@ import Animated, {
   withDecay,
   measure,
   runOnUI,
+  useDerivedValue,
+  withTiming,
 } from 'react-native-reanimated';
 import { Gesture, GestureDetector } from 'react-native-gesture-handler';
-const { width, height: height_ } = Dimensions.get('screen');
+const { width: screenWidth, height: screenHeight } = Dimensions.get('screen');
 
 const MangaReader = () => {
   const viewRef = useAnimatedRef();
   const [images, setImages] = useState([]);
-  const maxHeight = useSharedValue(0);
+
+  const viewWidth = useSharedValue(0);
+  const viewHeight = useSharedValue(0);
+  const maxWidth = useDerivedValue(
+    () => viewWidth.value - screenWidth,
+    [viewWidth.value]
+  );
+  const maxHeight = useDerivedValue(
+    () => viewHeight.value - screenHeight,
+    [viewHeight.value]
+  );
+
+  const transitionX = useSharedValue(0);
   const transitionY = useSharedValue(0);
+  const offsetX = useSharedValue(0);
   const offsetY = useSharedValue(0);
+  const focalX = useSharedValue(0);
+  const focalY = useSharedValue(0);
   const scale = useSharedValue(1);
+  const prev1 = useSharedValue(1);
+  const prev2 = useSharedValue(1);
+  const scaleOffset = useSharedValue(1);
 
   useEffect(() => {
     // 'fullscreen' mode
@@ -36,69 +56,108 @@ const MangaReader = () => {
       StatusBar.setStatusBarHidden(false);
     };
   }, []);
-
   const pan = Gesture.Pan()
+    .averageTouches(true)
     .onBegin(() => {
-      // to prevent glitchy behavior
-      cancelAnimation(transitionY);
-      // tracks previous location
-      offsetY.value = transitionY.value;
+      cancelAnimation(transitionX);
+      cancelAnimation(transitionY); // to prevent glitchy behavior
+      offsetX.value = transitionX.value;
+      offsetY.value = transitionY.value; // tracks previous location
     })
-    .onUpdate(({ translationY }) => {
-      // checks for content boundaries
-      if (translationY < 0) {
-        transitionY.value =
-          translationY + offsetY.value < -maxHeight.value
-            ? -maxHeight.value
-            : translationY + offsetY.value;
-      } else {
-        transitionY.value =
-          translationY + offsetY.value > 0 ? 0 : translationY + offsetY.value;
+    .onUpdate(
+      ({
+        translationY,
+        translationX,
+        numberOfPointers,
+        absoluteX,
+        absoluteY,
+      }) => {
+        // checks for content boundaries
+        // console.log(
+        //   translationX / scale.value + offsetX.value,
+        //   maxWidth.value,
+        //   translationY / scale.value + offsetY.value,
+        //   maxHeight.value
+        // );
+        if (translationY < 0) {
+          transitionY.value =
+            translationY / scale.value + offsetY.value < -maxHeight.value
+              ? -maxHeight.value
+              : translationY / scale.value + offsetY.value;
+        } else {
+          transitionY.value =
+            translationY / scale.value + offsetY.value > 0
+              ? 0
+              : translationY / scale.value + offsetY.value;
+        }
+
+        if (translationX < 0) {
+          transitionX.value =
+            translationX / scale.value + offsetX.value < -maxWidth.value
+              ? -maxWidth.value
+              : translationX / scale.value + offsetX.value;
+        } else {
+          transitionX.value =
+            translationX / scale.value + offsetX.value > 0
+              ? 0
+              : translationX / scale.value + offsetX.value;
+        }
       }
-    })
-    .onEnd(({ velocityY }) => {
-      // 'scroll' animation.
+    )
+    .onEnd(({ velocityX, velocityY, numberOfPointers }) => {
+      transitionX.value = withDecay({
+        velocity: velocityX / scale.value,
+        deceleration: 0.999,
+        clamp: [-maxWidth.value, 0],
+      }); // 'scroll' animation.
       transitionY.value = withDecay({
-        velocity: velocityY,
-        deceleration: 0.9997,
+        velocity: velocityY / scale.value,
+        deceleration: 0.9996,
         clamp: [-maxHeight.value, 0],
-      });
+      }); // 'scroll' animation.
     });
 
-  const pinch = Gesture.Pinch().onUpdate(({ scale: scale_ }) => {
-    scale.value = scale_;
-  });
-  // !!! not sure if 'Simultaneous' needed
-  const gesture = Gesture.Race(pinch, pan, Gesture.Simultaneous(pinch, pan));
+  const pinch = Gesture.Pinch()
+    .onStart(({ scale: scale_, focalX: focalx, focalY: focaly, velocity }) => {
+      focalX.value = withTiming(focalx, { duration: 128 });
+      focalY.value = withTiming(focaly, { duration: 128 });
+    })
+    .onUpdate(({ scale: scale_, focalX: focalx, focalY: focaly }) => {
+      scale.value = scale_ * scaleOffset.value;
+    })
+    .onEnd(({ scale: scale_, focalX: focalx, focalY: focaly }) => {
+      scaleOffset.value = scale.value;
+    });
+
+  const gesture = Gesture.Race(pan, pinch, Gesture.Simultaneous(pinch, pan));
 
   const style = useAnimatedStyle(() => ({
-    width: scale.value * width,
-    transform: [{ translateY: transitionY.value }],
+    transform: [
+      { translateX: focalX.value },
+      { translateY: focalY.value },
+      { translateX: -viewWidth.value / 2 },
+      { translateY: -viewHeight.value / 2 },
+      { scale: scale.value },
+      { translateX: -focalX.value },
+      { translateY: -focalY.value },
+      { translateX: viewWidth.value / 2 },
+      { translateY: viewHeight.value / 2 },
+      { translateX: transitionX.value },
+      { translateY: transitionY.value },
+    ],
   }));
 
   return (
     <GestureDetector gesture={gesture}>
-      <View
-        style={{
-          alignItems: 'center',
-        }}
-      >
+      <View style={{ alignItems: 'center' }}>
         <Animated.View
           ref={viewRef}
-          // idk which of those faster and better (ui or js)
           onLayout={(event) => {
             // recalculates maxHeight, for boundaries
-            // - height_ (screen height) is for not letting scroll overlow
-            maxHeight.value = event.nativeEvent.layout.height - height_;
-
-            // runOnUI(() => {
-            //   'worklet';
-            //   let height = measure(viewRef).height;
-            //   if (!height) return;
-            //   maxHeight.value = height - height_;
-            // })();
+            viewWidth.value = event.nativeEvent.layout.width;
+            viewHeight.value = event.nativeEvent.layout.height;
           }}
-          style={([{ position: 'absolute' }], style)}
+          style={style}
         >
           {images.map((item) => {
             return (

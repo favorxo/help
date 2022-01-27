@@ -1,0 +1,12 @@
+      if (translationY < 0) {
+        transitionY.value =
+          translationY + offsetY.value < -maxHeight.value
+            ? -maxHeight.value
+            : translationY + offsetY.value;
+      } else {
+        transitionY.value =
+          translationY + offsetY.value > 0 ? 0 : translationY + offsetY.value;
+      }
+
+
+      
