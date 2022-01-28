@@ -64,68 +64,60 @@ const MangaReader = () => {
       offsetX.value = transitionX.value;
       offsetY.value = transitionY.value; // tracks previous location
     })
-    .onUpdate(
-      ({
-        translationY,
-        translationX,
-        numberOfPointers,
-        absoluteX,
-        absoluteY,
-      }) => {
-        // checks for content boundaries
-        // console.log(
-        //   translationX / scale.value + offsetX.value,
-        //   maxWidth.value,
-        //   translationY / scale.value + offsetY.value,
-        //   maxHeight.value
-        // );
-        if (translationY < 0) {
-          transitionY.value =
-            translationY / scale.value + offsetY.value < -maxHeight.value
-              ? -maxHeight.value
-              : translationY / scale.value + offsetY.value;
-        } else {
-          transitionY.value =
-            translationY / scale.value + offsetY.value > 0
-              ? 0
-              : translationY / scale.value + offsetY.value;
-        }
-
-        if (translationX < 0) {
-          transitionX.value =
-            translationX / scale.value + offsetX.value < -maxWidth.value
-              ? -maxWidth.value
-              : translationX / scale.value + offsetX.value;
-        } else {
-          transitionX.value =
-            translationX / scale.value + offsetX.value > 0
-              ? 0
-              : translationX / scale.value + offsetX.value;
-        }
+    .onUpdate((e) => {
+      // checks for content boundaries
+      // console.log(
+      //   translationX / scale.value + offsetX.value,
+      //   maxWidth.value,
+      //   translationY / scale.value + offsetY.value,
+      //   maxHeight.value
+      // );
+      if (e.translationY < 0) {
+        transitionY.value =
+          e.translationY / scale.value + offsetY.value < -maxHeight.value
+            ? -maxHeight.value
+            : e.translationY / scale.value + offsetY.value;
+      } else {
+        transitionY.value =
+          e.translationY / scale.value + offsetY.value > 0
+            ? 0
+            : e.translationY / scale.value + offsetY.value;
       }
-    )
-    .onEnd(({ velocityX, velocityY, numberOfPointers }) => {
+
+      if (e.translationX < 0) {
+        transitionX.value =
+          e.translationX / scale.value + offsetX.value < -maxWidth.value
+            ? -maxWidth.value
+            : e.translationX / scale.value + offsetX.value;
+      } else {
+        transitionX.value =
+          e.translationX / scale.value + offsetX.value > 0
+            ? 0
+            : e.translationX / scale.value + offsetX.value;
+      }
+    })
+    .onEnd((e) => {
       transitionX.value = withDecay({
-        velocity: velocityX / scale.value,
+        velocity: e.velocityX / scale.value,
         deceleration: 0.999,
         clamp: [-maxWidth.value, 0],
       }); // 'scroll' animation.
       transitionY.value = withDecay({
-        velocity: velocityY / scale.value,
+        velocity: e.velocityY / scale.value,
         deceleration: 0.9996,
         clamp: [-maxHeight.value, 0],
       }); // 'scroll' animation.
     });
 
   const pinch = Gesture.Pinch()
-    .onStart(({ scale: scale_, focalX: focalx, focalY: focaly, velocity }) => {
-      focalX.value = withTiming(focalx, { duration: 128 });
-      focalY.value = withTiming(focaly, { duration: 128 });
+    .onStart((e) => {
+      focalX.value = withTiming(e.focalX, { duration: 128 });
+      focalY.value = withTiming(e.focalY, { duration: 128 });
     })
-    .onUpdate(({ scale: scale_, focalX: focalx, focalY: focaly }) => {
-      scale.value = scale_ * scaleOffset.value;
+    .onUpdate((e) => {
+      scale.value = e.scale * scaleOffset.value;
     })
-    .onEnd(({ scale: scale_, focalX: focalx, focalY: focaly }) => {
+    .onEnd((e) => {
       scaleOffset.value = scale.value;
     });
 
