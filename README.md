@@ -6,9 +6,8 @@
 * Webtoon view(top-to-bottom) or regular(left-to-right)
 * You can zoom in/out 
 * Ability to set maximum/minimum zoom scale
-* When you zoom out the reader is centered
-* When you zoom in you can't get out of content(go beyond images)
-* When zooming the translate x, y will be in the center of your pinch gesture
+* When you zoom out the reader is centered by width
+* When you zoom in (zoom scale <= 1) you can't get out of content(go beyond images)
 * Double tap to reset zoom
 * Scroll experience like with `<ScrollView />`
 # TODO/Whys
