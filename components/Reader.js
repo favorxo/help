@@ -12,9 +12,10 @@ import Animated, {
   runOnUI,
   useDerivedValue,
   withTiming,
+  withSpring,
 } from 'react-native-reanimated';
 import FastImage from 'react-native-fast-image';
-
+import axios from 'axios';
 import { Gesture, GestureDetector } from 'react-native-gesture-handler';
 const { width: screenWidth, height: screenHeight } = Dimensions.get('screen');
 
@@ -24,14 +25,6 @@ const MangaReader = () => {
 
   const viewWidth = useSharedValue(0);
   const viewHeight = useSharedValue(0);
-  const maxWidth = useDerivedValue(
-    () => viewWidth.value - screenWidth,
-    [viewWidth.value]
-  );
-  const maxHeight = useDerivedValue(
-    () => viewHeight.value - screenHeight,
-    [viewHeight.value]
-  );
 
   const transitionX = useSharedValue(0);
   const transitionY = useSharedValue(0);
@@ -45,17 +38,29 @@ const MangaReader = () => {
   const offsetOriginY = useSharedValue(0);
   const scale = useSharedValue(1);
   const scaleOffset = useSharedValue(1);
-
+  const maxWidth = useDerivedValue(
+    () => viewWidth.value - screenWidth,
+    [viewWidth.value, scale.value]
+  );
+  const maxHeight = useDerivedValue(
+    () => viewHeight.value - screenHeight,
+    [viewHeight.value, scale.value]
+  );
   useEffect(() => {
     // 'fullscreen' mode
     NavigationBar.setVisibilityAsync('hidden');
     StatusBar.setStatusBarHidden(true);
 
-    fetch('https://api.remanga.org/api/titles/chapters/81271/')
-      .then((res) => res.json())
-      .then((res) => setImages(res.content.pages));
+    axios
+      .get('https://api.remanga.org/api/titles/chapters/81125/')
+      .then((res) => {
+        setImages(res.data.content.pages);
+      })
+      .catch((e) => console.log(e.respon));
 
-    return () => {};
+    return () => {
+      StatusBar.setStatusBarHidden(false);
+    };
   }, []);
 
   const pan = Gesture.Pan()
@@ -67,11 +72,8 @@ const MangaReader = () => {
       offsetY.value = transitionY.value; // tracks previous location
     })
     .onUpdate((e) => {
-      if (e.numberOfPointers >= 2) {
-        console.log('absolutes:', e.absoluteX, e.absoluteY);
-      }
-      transitionX.value = e.translationX / scale.value + offsetX.value;
-      transitionY.value = e.translationY / scale.value + offsetY.value;
+      transitionX.value = e.translationX + offsetX.value;
+      transitionY.value = e.translationY + offsetY.value;
     })
     .onEnd((e) => {
       transitionX.value = withDecay({
@@ -81,44 +83,39 @@ const MangaReader = () => {
       }); // 'scroll' animation.
       transitionY.value = withDecay({
         velocity: e.velocityY / scale.value,
-        deceleration: 0.9996,
+        deceleration: 0.9992,
         // clamp: [-maxHeight.value, 0],
       }); // 'scroll' animation.
     });
 
   const pinch = Gesture.Pinch()
     .onStart((e) => {
-      // focalOffsetX.value = focalX.value;
-      // focalOffsetY.value = focalY.value;
+      // TODO: Fix pinch starting from scale.value != 1
       scaleOffset.value = scale.value;
-      focalX.value = withTiming(e.focalX, { duration: 128 });
-      focalY.value = withTiming(e.focalY, { duration: 128 });
+      focalOffsetX.value = focalX.value;
+      focalOffsetY.value = focalY.value;
+      focalX.value = e.focalX;
+      focalY.value = e.focalY;
     })
     .onUpdate((e) => {
       scale.value = e.scale * scaleOffset.value;
-      focalX.value = e.focalX;
-      focalY.value = e.focalY;
     });
 
   const gesture = Gesture.Simultaneous(pinch, pan);
-  console.log(screenWidth);
+
   const style = useAnimatedStyle(() => ({
     transform: [
-      { translateX: -focalX.value },
-      { translateY: -focalY.value },
-      { translateX: -viewWidth.value / 2 },
-      { translateY: -viewHeight.value / 2 },
-      { scale: scale.value },
-      { translateX: viewWidth.value / 2 },
-      { translateY: viewHeight.value / 2 },
-      { translateX: focalX.value },
-      { translateY: focalY.value },
+      { translateX: -viewWidth.value / 2 + focalX.value },
+      { translateY: -viewHeight.value / 2 + focalY.value },
       { translateX: transitionX.value },
       { translateY: transitionY.value },
+      { scale: scale.value },
+      { translateX: viewWidth.value / 2 - focalX.value },
+      { translateY: viewHeight.value / 2 - focalY.value },
     ],
   }));
   return (
-    <View style={{ backgroundColor: 'red' }}>
+    <View style={{ backgroundColor: 'black' }}>
       <GestureDetector gesture={gesture}>
         <Animated.View
           ref={viewRef}
@@ -131,7 +128,8 @@ const MangaReader = () => {
         >
           {images.map((item) => {
             return (
-              <Image
+              <FastImage
+                resizeMode="contain"
                 key={item.id}
                 source={{ uri: item.link }}
                 style={{
